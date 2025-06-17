@@ -34,12 +34,17 @@ export function setupGoogleAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Google OAuth Strategy
-  passport.use(new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID!,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    callbackURL: "/api/auth/google/callback"
-  },
+  // Only setup Google OAuth if credentials are provided
+  const googleClientId = process.env.GOOGLE_CLIENT_ID;
+  const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  
+  if (googleClientId && googleClientSecret) {
+    // Google OAuth Strategy
+    passport.use(new GoogleStrategy({
+      clientID: googleClientId,
+      clientSecret: googleClientSecret,
+      callbackURL: "/api/auth/google/callback"
+    },
   async (accessToken, refreshToken, profile, done) => {
     try {
       // Check if user exists by Google ID
@@ -74,32 +79,35 @@ export function setupGoogleAuth(app: Express) {
     }
   }));
 
-  // Serialize/deserialize user for session
-  passport.serializeUser((user: any, done) => {
-    done(null, user.id);
-  });
+    // Serialize/deserialize user for session
+    passport.serializeUser((user: any, done) => {
+      done(null, user.id);
+    });
 
-  passport.deserializeUser(async (id: number, done) => {
-    try {
-      const user = await storage.getUser(id);
-      done(null, user);
-    } catch (error) {
-      done(error, null);
-    }
-  });
+    passport.deserializeUser(async (id: number, done) => {
+      try {
+        const user = await storage.getUser(id);
+        done(null, user);
+      } catch (error) {
+        done(error, null);
+      }
+    });
 
-  // Auth routes
-  app.get('/api/auth/google',
-    passport.authenticate('google', { scope: ['profile', 'email'] })
-  );
+    // Auth routes
+    app.get('/api/auth/google',
+      passport.authenticate('google', { scope: ['profile', 'email'] })
+    );
 
-  app.get('/api/auth/google/callback',
-    passport.authenticate('google', { failureRedirect: '/' }),
-    (req, res) => {
-      // Successful authentication, redirect to home
-      res.redirect('/');
-    }
-  );
+    app.get('/api/auth/google/callback',
+      passport.authenticate('google', { failureRedirect: '/' }),
+      (req, res) => {
+        // Successful authentication, redirect to home
+        res.redirect('/');
+      }
+    );
+  } else {
+    console.log('Google OAuth credentials not found. Google authentication will be disabled.');
+  }
 
   app.get('/api/auth/logout', (req, res) => {
     req.logout((err) => {

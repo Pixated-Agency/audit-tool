@@ -9,7 +9,8 @@ export default function Home() {
   const { user } = useAuth();
 
   const handleLogout = () => {
-    window.location.href = "/api/logout";
+    // Simple logout - in a real app this would clear session/tokens
+    window.location.href = "/";
   };
 
   const getInitials = (firstName?: string | null, lastName?: string | null) => {

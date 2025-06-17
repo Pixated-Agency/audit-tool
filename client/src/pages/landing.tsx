@@ -85,9 +85,7 @@ export default function Landing() {
     }
   };
 
-  const handleReplitAuth = () => {
-    window.location.href = "/api/login";
-  };
+
 
   const handleGoogleLogin = () => {
     // In a real implementation, this would integrate with Google OAuth
@@ -123,16 +121,7 @@ export default function Landing() {
                 <span className="text-sm font-medium">Continue with Google</span>
               </Button>
 
-              <Button
-                variant="outline"
-                className="w-full flex items-center justify-center px-4 py-3 border border-neutral-200 rounded-lg shadow-sm bg-white text-neutral-700 hover:bg-neutral-50 hover:border-neutral-300 transition-all duration-200"
-                onClick={handleReplitAuth}
-              >
-                <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M7 3v3H4v3h3v3h3V9h3V6h-3V3H7zm3 15v3h3v-3h-3z"/>
-                </svg>
-                <span className="text-sm font-medium">Continue with Replit</span>
-              </Button>
+
             </div>
 
             {/* Divider */}

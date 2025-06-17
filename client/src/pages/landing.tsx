@@ -92,7 +92,7 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-neutral-50 via-white to-neutral-100">
+    <div className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 pt-16 bg-gradient-to-br from-neutral-50 via-white to-neutral-100">
       <div className="max-w-md w-full space-y-8">
         {/* Header Section */}
         <div className="text-center">
@@ -102,8 +102,6 @@ export default function Landing() {
             </div>
             <h1 className="ml-3 text-2xl font-semibold text-neutral-800">Meta Ads Auditor</h1>
           </div>
-          <h2 className="text-3xl font-semibold text-neutral-800 mb-2">Welcome back</h2>
-          <p className="text-neutral-600 text-sm">Sign in to access your advertising insights</p>
         </div>
 
         {/* Auth Card */}
@@ -269,19 +267,7 @@ export default function Landing() {
           </CardContent>
         </Card>
 
-        {/* Footer */}
-        <div className="text-center">
-          <p className="text-xs text-neutral-500">
-            By signing in, you agree to our{" "}
-            <Button variant="link" className="text-xs text-meta-blue hover:text-meta-blue-dark p-0">
-              Terms of Service
-            </Button>{" "}
-            and{" "}
-            <Button variant="link" className="text-xs text-meta-blue hover:text-meta-blue-dark p-0">
-              Privacy Policy
-            </Button>
-          </p>
-        </div>
+
       </div>
     </div>
   );

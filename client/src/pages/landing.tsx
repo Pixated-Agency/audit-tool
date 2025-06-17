@@ -88,8 +88,7 @@ export default function Landing() {
 
 
   const handleGoogleLogin = () => {
-    // In a real implementation, this would integrate with Google OAuth
-    console.log("Google OAuth integration would go here");
+    window.location.href = '/api/auth/google';
   };
 
   return (

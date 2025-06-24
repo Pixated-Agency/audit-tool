@@ -113,7 +113,7 @@ export default function Landing() {
             <div className="w-12 h-12 bg-meta-blue rounded-xl flex items-center justify-center shadow-md">
               <SiFacebook className="text-white text-xl" />
             </div>
-            <h1 className="ml-3 text-2xl font-semibold text-neutral-800">Meta Ads Auditor</h1>
+            <h1 className="ml-3 text-2xl font-semibold text-neutral-800">Multi-Platform Ad Auditor</h1>
           </div>
         </div>
 

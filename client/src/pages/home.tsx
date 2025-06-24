@@ -1,22 +1,162 @@
+import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LogOut, TrendingUp, DollarSign, Users, Eye } from "lucide-react";
-import { SiFacebook } from "react-icons/si";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { LogOut, Plus, Eye, Download, Trash2, ArrowRight, ArrowLeft } from "lucide-react";
+import { SiFacebook, SiGoogle, SiTiktok } from "react-icons/si";
+import { apiRequest } from "@/lib/queryClient";
+import { format } from "date-fns";
+
+interface Audit {
+  id: number;
+  name: string;
+  platform: string;
+  status: string;
+  accountId: string | null;
+  accountName: string | null;
+  reportFormat: string;
+  createdBy: number;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+  reportUrl: string | null;
+}
+
+interface CreateAuditData {
+  name: string;
+  platform: string;
+  accountId: string;
+  accountName: string;
+  reportFormat: string;
+}
+
+const platforms = [
+  { value: "google-ads", label: "Google Ads", icon: SiGoogle },
+  { value: "google-analytics", label: "Google Analytics", icon: SiGoogle },
+  { value: "facebook-ads", label: "Facebook Ads", icon: SiFacebook },
+  { value: "tiktok-ads", label: "TikTok Ads", icon: SiTiktok },
+  { value: "microsoft-ads", label: "Microsoft Ads", icon: SiGoogle },
+];
+
+const reportFormats = [
+  { value: "pdf", label: "PDF" },
+  { value: "powerpoint", label: "PowerPoint" },
+  { value: "google-slides", label: "Google Slides" },
+  { value: "google-doc", label: "Google Doc" },
+];
 
 export default function Home() {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [auditData, setAuditData] = useState<Partial<CreateAuditData>>({});
+
+  const { data: audits = [], isLoading } = useQuery({
+    queryKey: ["/api/audits"],
+    enabled: !!user,
+  });
+
+  const createAuditMutation = useMutation({
+    mutationFn: (data: CreateAuditData) => apiRequest("/api/audits", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/audits"] });
+      setIsCreateDialogOpen(false);
+      setCurrentStep(1);
+      setAuditData({});
+      toast({
+        title: "Audit Created",
+        description: "Your audit is being processed and will be ready shortly.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create audit. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteAuditMutation = useMutation({
+    mutationFn: (id: number) => apiRequest(`/api/audits/${id}`, {
+      method: "DELETE",
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/audits"] });
+      toast({
+        title: "Audit Deleted",
+        description: "The audit has been removed successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete audit. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleLogout = () => {
-    // Simple logout - in a real app this would clear session/tokens
-    window.location.href = "/";
+    window.location.href = "/api/auth/logout";
   };
 
   const getInitials = (firstName?: string | null, lastName?: string | null) => {
     const first = firstName?.charAt(0) || "";
     const last = lastName?.charAt(0) || "";
     return (first + last).toUpperCase() || "U";
+  };
+
+  const getPlatformIcon = (platform: string) => {
+    const platformConfig = platforms.find(p => p.value === platform);
+    if (!platformConfig) return SiFacebook;
+    return platformConfig.icon;
+  };
+
+  const getPlatformLabel = (platform: string) => {
+    const platformConfig = platforms.find(p => p.value === platform);
+    return platformConfig?.label || platform;
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "processing":
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Processing</Badge>;
+      case "completed":
+        return <Badge variant="secondary" className="bg-green-100 text-green-800">Completed</Badge>;
+      case "failed":
+        return <Badge variant="destructive">Failed</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
+
+  const handleCreateAudit = () => {
+    if (auditData.name && auditData.platform && auditData.accountId && auditData.accountName && auditData.reportFormat) {
+      createAuditMutation.mutate(auditData as CreateAuditData);
+    }
+  };
+
+  const resetDialog = () => {
+    setCurrentStep(1);
+    setAuditData({});
+    setIsCreateDialogOpen(false);
   };
 
   return (
@@ -68,91 +208,238 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-neutral-800 mb-2">
-            Welcome back{user?.firstName ? `, ${user.firstName}` : ""}!
-          </h2>
-          <p className="text-neutral-600">
-            Ready to optimize your Meta advertising campaigns? Let's dive into your ad performance.
-          </p>
+        {/* Header Section */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h2 className="text-3xl font-bold text-neutral-800 mb-2">
+              Multi-Platform Audit Dashboard
+            </h2>
+            <p className="text-neutral-600">
+              Manage and monitor your advertising audits across Google, Facebook, TikTok, and Microsoft platforms.
+            </p>
+          </div>
+          
+          <Dialog open={isCreateDialogOpen} onOpenChange={resetDialog}>
+            <DialogTrigger asChild>
+              <Button className="bg-meta-blue hover:bg-meta-blue-dark text-white">
+                <Plus className="h-4 w-4 mr-2" />
+                Create Audit
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Create New Audit - Step {currentStep} of 3</DialogTitle>
+              </DialogHeader>
+              
+              {currentStep === 1 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Select Platform</h3>
+                  <div className="grid grid-cols-1 gap-3">
+                    {platforms.map((platform) => {
+                      const Icon = platform.icon;
+                      return (
+                        <div
+                          key={platform.value}
+                          className={`p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                            auditData.platform === platform.value
+                              ? "border-meta-blue bg-meta-blue/5"
+                              : "border-gray-200"
+                          }`}
+                          onClick={() => setAuditData({ ...auditData, platform: platform.value })}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <Icon className="h-6 w-6" />
+                            <span className="font-medium">{platform.label}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => setCurrentStep(2)}
+                      disabled={!auditData.platform}
+                      className="bg-meta-blue hover:bg-meta-blue-dark"
+                    >
+                      Next <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {currentStep === 2 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Connect Account</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="accountId">Account ID</Label>
+                      <Input
+                        id="accountId"
+                        placeholder="Enter account ID or select from connected accounts"
+                        value={auditData.accountId || ""}
+                        onChange={(e) => setAuditData({ ...auditData, accountId: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="accountName">Account Name</Label>
+                      <Input
+                        id="accountName"
+                        placeholder="Enter display name for this account"
+                        value={auditData.accountName || ""}
+                        onChange={(e) => setAuditData({ ...auditData, accountName: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-between">
+                    <Button variant="outline" onClick={() => setCurrentStep(1)}>
+                      <ArrowLeft className="h-4 w-4 mr-2" /> Back
+                    </Button>
+                    <Button
+                      onClick={() => setCurrentStep(3)}
+                      disabled={!auditData.accountId || !auditData.accountName}
+                      className="bg-meta-blue hover:bg-meta-blue-dark"
+                    >
+                      Next <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {currentStep === 3 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Customize Audit</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="auditName">Report Name</Label>
+                      <Input
+                        id="auditName"
+                        placeholder="Enter a name for this audit report"
+                        value={auditData.name || ""}
+                        onChange={(e) => setAuditData({ ...auditData, name: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="reportFormat">Report Format</Label>
+                      <Select
+                        value={auditData.reportFormat || ""}
+                        onValueChange={(value) => setAuditData({ ...auditData, reportFormat: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select report format" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {reportFormats.map((format) => (
+                            <SelectItem key={format.value} value={format.value}>
+                              {format.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex justify-between">
+                    <Button variant="outline" onClick={() => setCurrentStep(2)}>
+                      <ArrowLeft className="h-4 w-4 mr-2" /> Back
+                    </Button>
+                    <Button
+                      onClick={handleCreateAudit}
+                      disabled={!auditData.name || !auditData.reportFormat || createAuditMutation.isPending}
+                      className="bg-meta-blue hover:bg-meta-blue-dark"
+                    >
+                      {createAuditMutation.isPending ? "Creating..." : "Run Audit"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
 
-        {/* Dashboard Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white shadow-auth hover:shadow-auth-hover transition-shadow duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-neutral-600">Total Spend</CardTitle>
-              <DollarSign className="h-4 w-4 text-meta-blue" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-neutral-800">$0.00</div>
-              <p className="text-xs text-neutral-500">No campaigns connected yet</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white shadow-auth hover:shadow-auth-hover transition-shadow duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-neutral-600">Impressions</CardTitle>
-              <Eye className="h-4 w-4 text-meta-blue" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-neutral-800">0</div>
-              <p className="text-xs text-neutral-500">Connect your Meta account</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white shadow-auth hover:shadow-auth-hover transition-shadow duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-neutral-600">Conversions</CardTitle>
-              <TrendingUp className="h-4 w-4 text-meta-blue" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-neutral-800">0</div>
-              <p className="text-xs text-neutral-500">Start auditing to see data</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white shadow-auth hover:shadow-auth-hover transition-shadow duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-neutral-600">Reach</CardTitle>
-              <Users className="h-4 w-4 text-meta-blue" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-neutral-800">0</div>
-              <p className="text-xs text-neutral-500">Link your ad accounts</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Getting Started Section */}
+        {/* Audits Table */}
         <Card className="bg-white shadow-auth">
           <CardHeader>
             <CardTitle className="text-xl font-semibold text-neutral-800">
-              Get Started with Meta Ads Auditing
+              Audit History
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="text-neutral-600">
-              <p className="mb-4">
-                Welcome to Meta Ads Auditor! To start analyzing your advertising performance, follow these steps:
-              </p>
-              <ol className="list-decimal list-inside space-y-2 text-sm">
-                <li>Connect your Meta Business account</li>
-                <li>Select the ad accounts you want to audit</li>
-                <li>Configure your performance thresholds</li>
-                <li>Run your first audit and get actionable insights</li>
-              </ol>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button className="bg-meta-blue hover:bg-meta-blue-dark text-white">
-                Connect Meta Account
-              </Button>
-              <Button variant="outline" className="border-meta-blue text-meta-blue hover:bg-meta-blue hover:text-white">
-                View Documentation
-              </Button>
-            </div>
+          <CardContent>
+            {isLoading ? (
+              <div className="text-center py-8">
+                <p className="text-neutral-500">Loading audits...</p>
+              </div>
+            ) : audits.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-neutral-500 mb-4">No audits created yet.</p>
+                <Button
+                  onClick={() => setIsCreateDialogOpen(true)}
+                  className="bg-meta-blue hover:bg-meta-blue-dark text-white"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Your First Audit
+                </Button>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Platform</TableHead>
+                    <TableHead>Date/Time</TableHead>
+                    <TableHead>Account</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created by</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {audits.map((audit: Audit) => {
+                    const Icon = getPlatformIcon(audit.platform);
+                    return (
+                      <TableRow key={audit.id}>
+                        <TableCell className="font-medium">{audit.name}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <Icon className="h-4 w-4" />
+                            <span>{getPlatformLabel(audit.platform)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {format(new Date(audit.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                        </TableCell>
+                        <TableCell>{audit.accountName || audit.accountId}</TableCell>
+                        <TableCell>{getStatusBadge(audit.status)}</TableCell>
+                        <TableCell>
+                          {user?.firstName && user?.lastName 
+                            ? `${user.firstName} ${user.lastName}`
+                            : user?.email || "Unknown"
+                          }
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <Button variant="ghost" size="sm">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            {audit.status === "completed" && (
+                              <Button variant="ghost" size="sm">
+                                <Download className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => deleteAuditMutation.mutate(audit.id)}
+                              disabled={deleteAuditMutation.isPending}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </main>

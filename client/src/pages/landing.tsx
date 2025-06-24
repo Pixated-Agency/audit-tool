@@ -70,16 +70,29 @@ export default function Landing() {
     setIsLoading(true);
 
     try {
-      // In a real implementation, this would make an API call
-      // For now, we'll simulate the login process
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      setAuthSuccess("Successfully signed in! Redirecting...");
-      setTimeout(() => {
-        window.location.href = "/";
-      }, 1500);
+      const response = await fetch('/api/auth/test-login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setAuthSuccess("Successfully signed in! Redirecting...");
+        setTimeout(() => {
+          window.location.href = "/";
+        }, 1500);
+      } else {
+        setAuthError(data.message || "Invalid email or password. Please try again.");
+      }
     } catch (error) {
-      setAuthError("Invalid email or password. Please try again.");
+      setAuthError("Login failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -128,6 +141,15 @@ export default function Landing() {
               </div>
               <div className="relative flex justify-center text-sm">
                 <span className="px-4 bg-white text-neutral-500">Or continue with email</span>
+              </div>
+            </div>
+
+            {/* Test Credentials Notice */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <h4 className="text-sm font-medium text-blue-800 mb-2">Test Login Credentials</h4>
+              <div className="text-sm text-blue-700">
+                <p><strong>Email:</strong> test@metaaudit.com</p>
+                <p><strong>Password:</strong> testpass123</p>
               </div>
             </div>
 

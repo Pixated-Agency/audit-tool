@@ -1,10 +1,16 @@
 import {
   users,
+  audits,
+  accountConnections,
   type User,
   type UpsertUser,
+  type Audit,
+  type UpsertAudit,
+  type AccountConnection,
+  type UpsertAccountConnection,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -14,7 +20,20 @@ export interface IStorage {
   getUserByGoogleId(googleId: string): Promise<User | undefined>;
   createUser(user: UpsertUser): Promise<User>;
   updateUser(id: number, user: Partial<UpsertUser>): Promise<User>;
-  // Other operations
+  
+  // Audit operations
+  getAudits(userId: number): Promise<Audit[]>;
+  getAudit(id: number): Promise<Audit | undefined>;
+  createAudit(audit: UpsertAudit): Promise<Audit>;
+  updateAudit(id: number, audit: Partial<UpsertAudit>): Promise<Audit>;
+  deleteAudit(id: number): Promise<void>;
+  
+  // Account connection operations
+  getAccountConnections(userId: number, platform?: string): Promise<AccountConnection[]>;
+  getAccountConnection(id: number): Promise<AccountConnection | undefined>;
+  createAccountConnection(connection: UpsertAccountConnection): Promise<AccountConnection>;
+  updateAccountConnection(id: number, connection: Partial<UpsertAccountConnection>): Promise<AccountConnection>;
+  deleteAccountConnection(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -52,7 +71,72 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  // Other operations
+  // Audit operations
+  async getAudits(userId: number): Promise<Audit[]> {
+    const result = await this.db
+      .select()
+      .from(audits)
+      .where(eq(audits.createdBy, userId))
+      .orderBy(desc(audits.createdAt));
+    return result;
+  }
+
+  async getAudit(id: number): Promise<Audit | undefined> {
+    const [audit] = await this.db.select().from(audits).where(eq(audits.id, id));
+    return audit;
+  }
+
+  async createAudit(auditData: UpsertAudit): Promise<Audit> {
+    const [audit] = await this.db.insert(audits).values(auditData).returning();
+    return audit;
+  }
+
+  async updateAudit(id: number, auditData: Partial<UpsertAudit>): Promise<Audit> {
+    const [audit] = await this.db
+      .update(audits)
+      .set({ ...auditData, updatedAt: new Date() })
+      .where(eq(audits.id, id))
+      .returning();
+    return audit;
+  }
+
+  async deleteAudit(id: number): Promise<void> {
+    await this.db.delete(audits).where(eq(audits.id, id));
+  }
+
+  // Account connection operations
+  async getAccountConnections(userId: number, platform?: string): Promise<AccountConnection[]> {
+    let query = this.db.select().from(accountConnections).where(eq(accountConnections.userId, userId));
+    
+    if (platform) {
+      query = query.where(eq(accountConnections.platform, platform));
+    }
+    
+    return await query;
+  }
+
+  async getAccountConnection(id: number): Promise<AccountConnection | undefined> {
+    const [connection] = await this.db.select().from(accountConnections).where(eq(accountConnections.id, id));
+    return connection;
+  }
+
+  async createAccountConnection(connectionData: UpsertAccountConnection): Promise<AccountConnection> {
+    const [connection] = await this.db.insert(accountConnections).values(connectionData).returning();
+    return connection;
+  }
+
+  async updateAccountConnection(id: number, connectionData: Partial<UpsertAccountConnection>): Promise<AccountConnection> {
+    const [connection] = await this.db
+      .update(accountConnections)
+      .set({ ...connectionData, updatedAt: new Date() })
+      .where(eq(accountConnections.id, id))
+      .returning();
+    return connection;
+  }
+
+  async deleteAccountConnection(id: number): Promise<void> {
+    await this.db.delete(accountConnections).where(eq(accountConnections.id, id));
+  }
 }
 
 export const storage = new DatabaseStorage();

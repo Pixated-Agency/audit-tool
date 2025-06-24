@@ -1,8 +1,8 @@
-# Meta Ads Auditor - System Architecture Guide
+# Multi-Platform Ad Auditor - System Architecture Guide
 
 ## Overview
 
-This is a full-stack web application built for auditing Meta (Facebook) advertising campaigns. The application uses a modern tech stack with React for the frontend, Express.js for the backend, and PostgreSQL for data persistence. The system is designed with a focus on user authentication, scalable data management, and a responsive user interface.
+This is a full-stack web application built for auditing advertising campaigns across multiple platforms including Google Ads, Google Analytics, Facebook Ads, TikTok Ads, and Microsoft (Bing) Ads. The application uses a modern tech stack with React for the frontend, Express.js for the backend, and PostgreSQL for data persistence. The system is designed with a focus on user authentication, scalable data management, multi-platform audit workflow, and a responsive user interface.
 
 ## System Architecture
 
@@ -40,6 +40,8 @@ This is a full-stack web application built for auditing Meta (Facebook) advertis
 ### Database Schema
 - **Users Table**: Stores user profiles with Google OAuth integration
 - **Sessions Table**: Manages user sessions with automatic expiration
+- **Audits Table**: Stores audit reports with platform, status, and metadata
+- **Account Connections Table**: Manages connected advertising accounts across platforms
 - **Schema Management**: Drizzle migrations with type-safe queries
 
 ### UI/UX Design
@@ -114,10 +116,19 @@ This is a full-stack web application built for auditing Meta (Facebook) advertis
 - **Connection Pooling**: Neon serverless handles connection management
 - **Session Cleanup**: Automatic session expiration via PostgreSQL TTL
 
+## Recent Changes
+
+- June 24, 2025: Expanded platform support from Meta-only to multi-platform (Google, Facebook, TikTok, Microsoft)
+- Added comprehensive audit workflow with 3-step creation process (Platform Selection → Account Connection → Audit Customization)
+- Implemented audit table dashboard with status tracking, platform icons, and action buttons
+- Created new database tables for audits and account connections
+- Updated UI to Multi-Platform Ad Auditor branding
+- Added real-time audit status updates (processing → completed)
+
 ## Changelog
 
 Changelog:
-- June 24, 2025. Initial setup
+- June 24, 2025. Initial setup and multi-platform expansion
 
 ## User Preferences
 

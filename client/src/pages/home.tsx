@@ -170,7 +170,7 @@ export default function Home() {
               <div className="w-10 h-10 bg-meta-blue rounded-xl flex items-center justify-center shadow-md">
                 <SiFacebook className="text-white text-lg" />
               </div>
-              <h1 className="ml-3 text-xl font-semibold text-neutral-800">Meta Ads Auditor</h1>
+              <h1 className="ml-3 text-xl font-semibold text-neutral-800">Multi-Platform Ad Auditor</h1>
             </div>
 
             {/* User Profile */}

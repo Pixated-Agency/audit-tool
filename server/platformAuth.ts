@@ -158,7 +158,7 @@ export function setupPlatformAuth(app: Express) {
   });
 
   // OAuth callback handlers
-  app.get("/api/auth/:platform/callback", requireAuth, async (req, res) => {
+  app.get("/api/auth/:platform/callback", async (req, res) => {
     try {
       const { platform } = req.params;
       const { code, state, error } = req.query;
@@ -171,12 +171,14 @@ export function setupPlatformAuth(app: Express) {
         return res.redirect(`/?error=invalid_callback&platform=${platform}`);
       }
 
-      // Verify state parameter
+      // Verify state parameter and get user ID from it
+      let userId: number;
       try {
         const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
-        if (stateData.userId !== (req.user as any).id || stateData.platform !== platform) {
+        if (stateData.platform !== platform) {
           return res.redirect(`/?error=invalid_state&platform=${platform}`);
         }
+        userId = stateData.userId;
       } catch {
         return res.redirect(`/?error=invalid_state&platform=${platform}`);
       }
@@ -287,7 +289,7 @@ export function setupPlatformAuth(app: Express) {
 
         // Store the connection
         const connection = await storage.createAccountConnection({
-          userId: (req.user as any).id,
+          userId: userId,
           platform,
           accountId: accountInfo.id,
           accountName: accountInfo.name,

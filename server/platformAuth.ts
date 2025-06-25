@@ -92,7 +92,7 @@ export function setupPlatformAuth(app: Express) {
             `state=${state}`;
           
           console.log(`Google Ads OAuth - Redirect URI: ${redirectUri}`);
-          console.log(`Google Ads OAuth - Auth URL generated`);
+          console.log(`Google Ads OAuth - Auth URL: ${authUrl}`);
           break;
           
         case 'google-analytics':
@@ -268,37 +268,7 @@ export function setupPlatformAuth(app: Express) {
     }
   });
 
-  // Demo connection for platforms requiring special approval
-  app.get("/api/auth/:platform/demo-connect", requireAuth, async (req, res) => {
-    try {
-      const { platform } = req.params;
-      const config = PLATFORM_CONFIGS[platform as keyof typeof PLATFORM_CONFIGS];
-      
-      if (!config) {
-        return res.redirect(`/?error=unsupported_platform&platform=${platform}`);
-      }
 
-      console.log(`Creating demo connection for user ${(req.user as any).id} on platform ${platform}`);
-
-      // Create demo connection with clear labeling
-      const connection = await storage.createAccountConnection({
-        userId: (req.user as any).id,
-        platform,
-        accountId: `demo_verified_${platform}_${Date.now()}`,
-        accountName: `Demo ${config.name} Account (Sandbox)`,
-        accessToken: `demo_token_${platform}`,
-        refreshToken: null,
-        expiresAt: new Date(Date.now() + 24 * 3600000), // 24 hours
-        isActive: 1
-      });
-
-      console.log(`Demo connection created successfully:`, connection);
-      res.redirect(`/?success=demo_connected&platform=${platform}&account=${encodeURIComponent(connection.accountName)}`);
-    } catch (error) {
-      console.error("Demo connection error:", error);
-      res.redirect(`/?error=demo_connection&platform=${platform}`);
-    }
-  });
 
   // Get platform data for audit
   app.get("/api/platform-data/:platform/:accountId", requireAuth, async (req, res) => {
@@ -326,110 +296,11 @@ export function setupPlatformAuth(app: Express) {
     }
   });
 
-  // TikTok Ads OAuth simulation
-  app.get("/api/auth/tiktok-ads", requireAuth, async (req, res) => {
-    try {
-      const userId = (req.user as any).id;
-      const platform = "tiktok-ads";
-      
-      console.log(`Creating connection for user ${userId} on platform ${platform}`);
 
-      const mockConnection = await storage.createAccountConnection({
-        userId: (req.user as any).id,
-        platform,
-        accountId: `demo_${platform}_${Date.now()}`,
-        accountName: `Demo TikTok Ads Account`,
-        accessToken: `mock_token_${platform}`,
-        refreshToken: `mock_refresh_${platform}`,
-        expiresAt: new Date(Date.now() + 3600000), // 1 hour
-        isActive: 1
-      });
 
-      console.log(`Successfully created connection:`, mockConnection);
 
-      res.json({ 
-        success: true, 
-        connection: mockConnection,
-        message: "Successfully connected to TikTok Ads"
-      });
-    } catch (error) {
-      console.error("Platform auth error:", error);
-      res.status(500).json({ 
-        message: "Failed to connect platform", 
-        error: error instanceof Error ? error.message : "Unknown error" 
-      });
-    }
-  });
 
-  // Microsoft Ads OAuth simulation
-  app.get("/api/auth/microsoft-ads", requireAuth, async (req, res) => {
-    try {
-      const userId = (req.user as any).id;
-      const platform = "microsoft-ads";
-      
-      console.log(`Creating connection for user ${userId} on platform ${platform}`);
 
-      const mockConnection = await storage.createAccountConnection({
-        userId: (req.user as any).id,
-        platform,
-        accountId: `demo_${platform}_${Date.now()}`,
-        accountName: `Demo Microsoft Ads Account`,
-        accessToken: `mock_token_${platform}`,
-        refreshToken: `mock_refresh_${platform}`,
-        expiresAt: new Date(Date.now() + 3600000), // 1 hour
-        isActive: 1
-      });
-
-      console.log(`Successfully created connection:`, mockConnection);
-
-      res.json({ 
-        success: true, 
-        connection: mockConnection,
-        message: "Successfully connected to Microsoft Ads"
-      });
-    } catch (error) {
-      console.error("Platform auth error:", error);
-      res.status(500).json({ 
-        message: "Failed to connect platform", 
-        error: error instanceof Error ? error.message : "Unknown error" 
-      });
-    }
-  });
-
-  // Google Analytics OAuth simulation
-  app.get("/api/auth/google-analytics", requireAuth, async (req, res) => {
-    try {
-      const userId = (req.user as any).id;
-      const platform = "google-analytics";
-      
-      console.log(`Creating connection for user ${userId} on platform ${platform}`);
-
-      const mockConnection = await storage.createAccountConnection({
-        userId: (req.user as any).id,
-        platform,
-        accountId: `demo_${platform}_${Date.now()}`,
-        accountName: `Demo Google Analytics Account`,
-        accessToken: `mock_token_${platform}`,
-        refreshToken: `mock_refresh_${platform}`,
-        expiresAt: new Date(Date.now() + 3600000), // 1 hour
-        isActive: 1
-      });
-
-      console.log(`Successfully created connection:`, mockConnection);
-
-      res.json({ 
-        success: true, 
-        connection: mockConnection,
-        message: "Successfully connected to Google Analytics"
-      });
-    } catch (error) {
-      console.error("Platform auth error:", error);
-      res.status(500).json({ 
-        message: "Failed to connect platform", 
-        error: error instanceof Error ? error.message : "Unknown error" 
-      });
-    }
-  });
 }
 
 function generateMockPlatformData(platform: string, accountName: string) {

@@ -34,9 +34,16 @@ interface Audit {
 interface CreateAuditData {
   name: string;
   platform: string;
+  connectionId: number;
+  reportFormat: string;
+}
+
+interface AccountConnection {
+  id: number;
+  platform: string;
   accountId: string;
   accountName: string;
-  reportFormat: string;
+  isActive: boolean;
 }
 
 const platforms = [
@@ -62,10 +69,16 @@ export default function Home() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [auditData, setAuditData] = useState<Partial<CreateAuditData>>({});
+  const [selectedConnection, setSelectedConnection] = useState<AccountConnection | null>(null);
 
   const { data: audits = [], isLoading } = useQuery({
     queryKey: ["/api/audits"],
     enabled: !!user,
+  });
+
+  const { data: connections = [] } = useQuery({
+    queryKey: ["/api/account-connections", auditData.platform],
+    enabled: !!user && !!auditData.platform,
   });
 
   const createAuditMutation = useMutation({
@@ -79,15 +92,36 @@ export default function Home() {
       setIsCreateDialogOpen(false);
       setCurrentStep(1);
       setAuditData({});
+      setSelectedConnection(null);
       toast({
         title: "Audit Created",
-        description: "Your audit is being processed and will be ready shortly.",
+        description: "Your audit is being processed with AI analysis and will be ready shortly.",
       });
     },
     onError: () => {
       toast({
         title: "Error",
         description: "Failed to create audit. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const connectPlatformMutation = useMutation({
+    mutationFn: (platform: string) => apiRequest(`/api/auth/${platform}`, {
+      method: "GET",
+    }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/account-connections"] });
+      toast({
+        title: "Account Connected",
+        description: data.message,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Connection Failed",
+        description: "Failed to connect account. Please try again.",
         variant: "destructive",
       });
     },
@@ -148,7 +182,7 @@ export default function Home() {
   };
 
   const handleCreateAudit = () => {
-    if (auditData.name && auditData.platform && auditData.accountId && auditData.accountName && auditData.reportFormat) {
+    if (auditData.name && auditData.platform && auditData.connectionId && auditData.reportFormat) {
       createAuditMutation.mutate(auditData as CreateAuditData);
     }
   };
@@ -156,7 +190,14 @@ export default function Home() {
   const resetDialog = () => {
     setCurrentStep(1);
     setAuditData({});
+    setSelectedConnection(null);
     setIsCreateDialogOpen(false);
+  };
+
+  const handleConnectPlatform = () => {
+    if (auditData.platform) {
+      connectPlatformMutation.mutate(auditData.platform);
+    }
   };
 
   return (
@@ -270,33 +311,69 @@ export default function Home() {
               {currentStep === 2 && (
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Connect Account</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="accountId">Account ID</Label>
-                      <Input
-                        id="accountId"
-                        placeholder="Enter account ID or select from connected accounts"
-                        value={auditData.accountId || ""}
-                        onChange={(e) => setAuditData({ ...auditData, accountId: e.target.value })}
-                      />
+                  
+                  {connections.length === 0 ? (
+                    <div className="text-center py-6 border border-dashed border-gray-300 rounded-lg">
+                      <p className="text-gray-500 mb-4">
+                        No {getPlatformLabel(auditData.platform || "")} accounts connected yet.
+                      </p>
+                      <Button 
+                        onClick={handleConnectPlatform}
+                        disabled={connectPlatformMutation.isPending}
+                        className="bg-meta-blue hover:bg-meta-blue-dark"
+                      >
+                        {connectPlatformMutation.isPending ? "Connecting..." : `Connect ${getPlatformLabel(auditData.platform || "")} Account`}
+                      </Button>
                     </div>
-                    <div>
-                      <Label htmlFor="accountName">Account Name</Label>
-                      <Input
-                        id="accountName"
-                        placeholder="Enter display name for this account"
-                        value={auditData.accountName || ""}
-                        onChange={(e) => setAuditData({ ...auditData, accountName: e.target.value })}
-                      />
+                  ) : (
+                    <div className="space-y-3">
+                      <Label>Select Connected Account</Label>
+                      {connections.map((connection: AccountConnection) => (
+                        <div
+                          key={connection.id}
+                          className={`p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                            selectedConnection?.id === connection.id
+                              ? "border-meta-blue bg-meta-blue/5"
+                              : "border-gray-200"
+                          }`}
+                          onClick={() => {
+                            setSelectedConnection(connection);
+                            setAuditData({ ...auditData, connectionId: connection.id });
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium">{connection.accountName}</p>
+                              <p className="text-sm text-gray-500">ID: {connection.accountId}</p>
+                            </div>
+                            {connection.isActive && (
+                              <Badge variant="secondary" className="bg-green-100 text-green-800">
+                                Active
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      
+                      <Button 
+                        variant="outline" 
+                        onClick={handleConnectPlatform}
+                        disabled={connectPlatformMutation.isPending}
+                        className="w-full"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        {connectPlatformMutation.isPending ? "Connecting..." : "Connect Another Account"}
+                      </Button>
                     </div>
-                  </div>
+                  )}
+                  
                   <div className="flex justify-between">
                     <Button variant="outline" onClick={() => setCurrentStep(1)}>
                       <ArrowLeft className="h-4 w-4 mr-2" /> Back
                     </Button>
                     <Button
                       onClick={() => setCurrentStep(3)}
-                      disabled={!auditData.accountId || !auditData.accountName}
+                      disabled={!selectedConnection}
                       className="bg-meta-blue hover:bg-meta-blue-dark"
                     >
                       Next <ArrowRight className="h-4 w-4 ml-2" />
@@ -346,7 +423,7 @@ export default function Home() {
                       disabled={!auditData.name || !auditData.reportFormat || createAuditMutation.isPending}
                       className="bg-meta-blue hover:bg-meta-blue-dark"
                     >
-                      {createAuditMutation.isPending ? "Creating..." : "Run Audit"}
+                      {createAuditMutation.isPending ? "Creating..." : "Run AI Audit"}
                     </Button>
                   </div>
                 </div>

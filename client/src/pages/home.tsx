@@ -90,9 +90,7 @@ export default function Home() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/audits"] });
       setIsCreateDialogOpen(false);
-      setCurrentStep(1);
-      setAuditData({});
-      setSelectedConnection(null);
+      resetDialog();
       toast({
         title: "Audit Created",
         description: "Your audit is being processed with AI analysis and will be ready shortly.",
@@ -193,7 +191,6 @@ export default function Home() {
     setCurrentStep(1);
     setAuditData({});
     setSelectedConnection(null);
-    setIsCreateDialogOpen(false);
   };
 
   const handleConnectPlatform = () => {
@@ -262,9 +259,12 @@ export default function Home() {
             </p>
           </div>
           
-          <Dialog open={isCreateDialogOpen} onOpenChange={resetDialog}>
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-meta-blue hover:bg-meta-blue-dark text-white">
+              <Button 
+                className="bg-meta-blue hover:bg-meta-blue-dark text-white"
+                onClick={() => setIsCreateDialogOpen(true)}
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Create Audit
               </Button>
@@ -455,7 +455,10 @@ export default function Home() {
               <div className="text-center py-8">
                 <p className="text-neutral-500 mb-4">No audits created yet.</p>
                 <Button
-                  onClick={() => setIsCreateDialogOpen(true)}
+                  onClick={() => {
+                    resetDialog();
+                    setIsCreateDialogOpen(true);
+                  }}
                   className="bg-meta-blue hover:bg-meta-blue-dark text-white"
                 >
                   <Plus className="h-4 w-4 mr-2" />

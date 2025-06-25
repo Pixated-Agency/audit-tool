@@ -69,20 +69,8 @@ export function setupPlatformAuth(app: Express) {
         timestamp: Date.now()
       })).toString('base64');
 
-      // Use the exact redirect URI configured in Google Cloud Console
-      let redirectUri: string;
-      if (platform === 'google-ads') {
-        // For Replit deployments, use the .replit.app domain
-        const host = req.get('host');
-        if (host?.includes('replit.app')) {
-          redirectUri = `https://${host}/api/auth/${platform}/callback`;
-        } else {
-          // For local development, Google needs exact URI match
-          redirectUri = `http://localhost:5000/api/auth/${platform}/callback`;
-        }
-      } else {
-        redirectUri = `${req.protocol}://${req.get('host')}/api/auth/${platform}/callback`;
-      }
+      // Build redirect URI based on current environment
+      const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/${platform}/callback`;
       
       let authUrl: string;
       
@@ -95,17 +83,17 @@ export function setupPlatformAuth(app: Express) {
             });
           }
           
-          console.log(`Google Ads OAuth URL - Client ID: ${process.env.GOOGLE_ADS_CLIENT_ID}`);
-          console.log(`Google Ads OAuth URL - Redirect URI: ${redirectUri}`);
+          authUrl = `https://accounts.google.com/oauth/authorize?` +
+            `client_id=${process.env.GOOGLE_ADS_CLIENT_ID}&` +
+            `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+            `scope=${encodeURIComponent(config.scope)}&` +
+            `response_type=code&` +
+            `access_type=offline&` +
+            `state=${state}`;
           
-          // For demo purposes, simulate the OAuth flow since Google Ads API requires business verification
-          return res.json({
-            success: true,
-            isDemo: true,
-            message: "Google Ads requires business verification. Using demo mode for testing.",
-            demoNote: "This demonstrates the audit workflow. Real implementation requires Google Ads API approval.",
-            authUrl: `/api/auth/${platform}/demo-connect`
-          });
+          console.log(`Google Ads OAuth - Redirect URI: ${redirectUri}`);
+          console.log(`Google Ads OAuth - Auth URL generated`);
+          break;
           
         case 'google-analytics':
           if (!process.env.GOOGLE_CLIENT_ID) {
@@ -148,11 +136,13 @@ export function setupPlatformAuth(app: Express) {
           return res.status(400).json({ message: "Unsupported platform" });
       }
 
-      // This shouldn't be reached due to individual platform handling above
       res.json({ 
         success: true, 
         authUrl,
-        message: `Redirecting to ${config.name} for authorization...`
+        message: `Redirecting to ${config.name} for authorization...`,
+        setupNote: platform === 'google-ads' ? 
+          `If you get a 403 error, your Google Cloud project may need domain verification or Google Ads API approval. Check Google Cloud Console.` : 
+          undefined
       });
     } catch (error) {
       console.error("Platform auth error:", error);
@@ -190,18 +180,8 @@ export function setupPlatformAuth(app: Express) {
 
       // Exchange code for access token
       let tokenData;
-      // Use the same redirect URI logic as in the auth initiation
-      let redirectUri: string;
-      if (platform === 'google-ads') {
-        const host = req.get('host');
-        if (host?.includes('replit.app')) {
-          redirectUri = `https://${host}/api/auth/${platform}/callback`;
-        } else {
-          redirectUri = `http://localhost:5000/api/auth/${platform}/callback`;
-        }
-      } else {
-        redirectUri = `${req.protocol}://${req.get('host')}/api/auth/${platform}/callback`;
-      }
+      // Use the same redirect URI as in auth initiation
+      const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/${platform}/callback`;
 
       try {
         if (platform === 'google-ads') {

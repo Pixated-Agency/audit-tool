@@ -82,13 +82,23 @@ export default function Home() {
   });
 
   const createAuditMutation = useMutation({
-    mutationFn: (data: CreateAuditData) => {
+    mutationFn: async (data: CreateAuditData) => {
       console.log("Creating audit with data:", data);
-      return apiRequest("/api/audits", {
+      const response = await fetch("/api/audits", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "credentials": "include"
+        },
         body: JSON.stringify(data),
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: "Unknown error" }));
+        throw new Error(errorData.message || `HTTP ${response.status}`);
+      }
+      
+      return response.json();
     },
     onSuccess: (result) => {
       console.log("Audit created successfully:", result);

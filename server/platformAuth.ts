@@ -75,10 +75,25 @@ export function setupPlatformAuth(app: Express) {
       
       switch (platform) {
         case 'google-ads':
+          if (!process.env.GOOGLE_ADS_CLIENT_ID) {
+            return res.status(500).json({ 
+              message: "Google Ads OAuth not configured. Please add GOOGLE_ADS_CLIENT_ID to environment variables.",
+              needsSetup: true 
+            });
+          }
+          authUrl = `https://accounts.google.com/oauth/authorize?` +
+            `client_id=${process.env.GOOGLE_ADS_CLIENT_ID}&` +
+            `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+            `scope=${encodeURIComponent(config.scope)}&` +
+            `response_type=code&` +
+            `access_type=offline&` +
+            `state=${state}`;
+          break;
+          
         case 'google-analytics':
           if (!process.env.GOOGLE_CLIENT_ID) {
             return res.status(500).json({ 
-              message: "Google OAuth not configured. Please add GOOGLE_CLIENT_ID to environment variables.",
+              message: "Google Analytics OAuth not configured. Please add GOOGLE_CLIENT_ID to environment variables.",
               needsSetup: true 
             });
           }
@@ -157,7 +172,20 @@ export function setupPlatformAuth(app: Express) {
       const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/${platform}/callback`;
 
       try {
-        if (platform === 'google-ads' || platform === 'google-analytics') {
+        if (platform === 'google-ads') {
+          const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              client_id: process.env.GOOGLE_ADS_CLIENT_ID!,
+              client_secret: process.env.GOOGLE_ADS_CLIENT_SECRET!,
+              code: code as string,
+              grant_type: 'authorization_code',
+              redirect_uri: redirectUri
+            })
+          });
+          tokenData = await tokenResponse.json();
+        } else if (platform === 'google-analytics') {
           const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -184,16 +212,24 @@ export function setupPlatformAuth(app: Express) {
             const accountResponse = await fetch('https://googleads.googleapis.com/v14/customers:listAccessibleCustomers', {
               headers: { 
                 'Authorization': `Bearer ${tokenData.access_token}`,
-                'developer-token': process.env.GOOGLE_ADS_DEVELOPER_TOKEN || ''
+                'developer-token': process.env.GOOGLE_ADS_DEVELOPER_TOKEN!
               }
             });
             const accountData = await accountResponse.json();
+            console.log('Google Ads API response:', accountData);
+            
             if (accountData.resourceNames?.length > 0) {
-              accountInfo.id = accountData.resourceNames[0];
-              accountInfo.name = `Google Ads Account`;
+              // Use the first accessible customer
+              const customerId = accountData.resourceNames[0].replace('customers/', '');
+              accountInfo.id = customerId;
+              accountInfo.name = `Google Ads Account (${customerId})`;
+            } else if (accountData.error) {
+              console.error('Google Ads API error:', accountData.error);
+              accountInfo.name = 'Google Ads Account (Limited Access)';
             }
           } catch (apiError) {
-            console.log('Using basic account info due to API limitations');
+            console.error('Google Ads API call failed:', apiError);
+            accountInfo.name = 'Google Ads Account (API Error)';
           }
         }
 

@@ -87,9 +87,9 @@ export default function Home() {
       const response = await fetch("/api/audits", {
         method: "POST",
         headers: { 
-          "Content-Type": "application/json",
-          "credentials": "include"
+          "Content-Type": "application/json"
         },
+        credentials: "include",
         body: JSON.stringify(data),
       });
       

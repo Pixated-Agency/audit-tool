@@ -1,43 +1,49 @@
-import { Express } from "express";
-import { requireAuth } from "./googleAuth";
+import { Express, RequestHandler } from "express";
 import { storage } from "./storage";
 
-// Platform OAuth configurations
 const PLATFORM_CONFIGS = {
   "google-ads": {
     name: "Google Ads",
-    authUrl: "https://accounts.google.com/oauth/authorize",
     scope: "https://www.googleapis.com/auth/adwords",
-    apiBase: "https://googleads.googleapis.com/v14"
+    authUrl: "https://accounts.google.com/oauth/authorize",
+    tokenUrl: "https://oauth2.googleapis.com/token"
   },
   "google-analytics": {
-    name: "Google Analytics",
-    authUrl: "https://accounts.google.com/oauth/authorize", 
+    name: "Google Analytics", 
     scope: "https://www.googleapis.com/auth/analytics.readonly",
-    apiBase: "https://analyticsreporting.googleapis.com/v4"
+    authUrl: "https://accounts.google.com/oauth/authorize",
+    tokenUrl: "https://oauth2.googleapis.com/token"
   },
   "facebook-ads": {
     name: "Facebook Ads",
+    scope: "ads_management,ads_read",
     authUrl: "https://www.facebook.com/v18.0/dialog/oauth",
-    scope: "ads_read,ads_management",
-    apiBase: "https://graph.facebook.com/v18.0"
+    tokenUrl: "https://graph.facebook.com/v18.0/oauth/access_token"
   },
   "tiktok-ads": {
     name: "TikTok Ads",
+    scope: "business_management",
     authUrl: "https://ads.tiktok.com/marketing_api/auth",
-    scope: "advertiser_read,campaign_read",
-    apiBase: "https://business-api.tiktok.com/open_api/v1.3"
+    tokenUrl: "https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token"
   },
   "microsoft-ads": {
     name: "Microsoft Ads",
+    scope: "bingads.manage",
     authUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-    scope: "https://ads.microsoft.com/ads.manage",
-    apiBase: "https://advertising.microsoft.com/api/advertiser"
+    tokenUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/token"
   }
 };
 
+export const requireAuth: RequestHandler = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+  next();
+};
+
 export function setupPlatformAuth(app: Express) {
-  // Initiate OAuth for a platform
+  
+  // Main OAuth initiation endpoint
   app.get("/api/auth/:platform", requireAuth, async (req, res) => {
     try {
       const { platform } = req.params;
@@ -48,15 +54,13 @@ export function setupPlatformAuth(app: Express) {
       }
 
       console.log(`Initiating OAuth for user ${(req.user as any).id} on platform ${platform}`);
-
-      // Check if user already has an active connection for this platform
-      const existingConnections = await storage.getAccountConnections((req.user as any).id, platform);
-      const activeConnection = existingConnections.find(conn => conn.isActive === 1);
       
-      if (activeConnection) {
-        return res.json({ 
-          success: true, 
-          connection: activeConnection,
+      // Check if user already has this platform connected
+      const existingConnections = await storage.getAccountConnections((req.user as any).id, platform);
+      if (existingConnections.length > 0) {
+        return res.json({
+          success: true,
+          connection: existingConnections[0],
           message: `You already have an active ${config.name} account connected`,
           isExisting: true
         });
@@ -92,7 +96,6 @@ export function setupPlatformAuth(app: Express) {
             `state=${state}`;
           
           console.log(`Google Ads OAuth - Redirect URI: ${redirectUri}`);
-          console.log(`Google Ads OAuth - Auth URL: ${authUrl}`);
           break;
           
         case 'google-analytics':
@@ -164,13 +167,17 @@ export function setupPlatformAuth(app: Express) {
       }
 
       if (!code || !state) {
-        return res.redirect(`/?error=oauth_invalid&platform=${platform}`);
+        return res.redirect(`/?error=invalid_callback&platform=${platform}`);
       }
 
-      // Decode and verify state
-      const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
-      if (stateData.userId !== (req.user as any).id) {
-        return res.redirect(`/?error=oauth_security&platform=${platform}`);
+      // Verify state parameter
+      try {
+        const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
+        if (stateData.userId !== (req.user as any).id || stateData.platform !== platform) {
+          return res.redirect(`/?error=invalid_state&platform=${platform}`);
+        }
+      } catch {
+        return res.redirect(`/?error=invalid_state&platform=${platform}`);
       }
 
       const config = PLATFORM_CONFIGS[platform as keyof typeof PLATFORM_CONFIGS];
@@ -180,36 +187,68 @@ export function setupPlatformAuth(app: Express) {
 
       // Exchange code for access token
       let tokenData;
-      // Use the same redirect URI as in auth initiation
       const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/${platform}/callback`;
 
       try {
-        if (platform === 'google-ads') {
-          const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-              client_id: process.env.GOOGLE_ADS_CLIENT_ID!,
-              client_secret: process.env.GOOGLE_ADS_CLIENT_SECRET!,
-              code: code as string,
-              grant_type: 'authorization_code',
-              redirect_uri: redirectUri
-            })
-          });
-          tokenData = await tokenResponse.json();
-        } else if (platform === 'google-analytics') {
-          const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-              client_id: process.env.GOOGLE_CLIENT_ID!,
-              client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-              code: code as string,
-              grant_type: 'authorization_code',
-              redirect_uri: redirectUri
-            })
-          });
-          tokenData = await tokenResponse.json();
+        switch (platform) {
+          case 'google-ads':
+            if (!process.env.GOOGLE_ADS_CLIENT_ID || !process.env.GOOGLE_ADS_CLIENT_SECRET) {
+              console.error("Missing Google Ads credentials");
+              return res.redirect(`/?error=missing_credentials&platform=${platform}`);
+            }
+            
+            console.log("Exchanging Google Ads authorization code for tokens...");
+            
+            const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({
+                client_id: process.env.GOOGLE_ADS_CLIENT_ID,
+                client_secret: process.env.GOOGLE_ADS_CLIENT_SECRET,
+                code: code as string,
+                grant_type: 'authorization_code',
+                redirect_uri: redirectUri,
+              }),
+            });
+            
+            tokenData = await tokenResponse.json();
+            
+            if (tokenData.error) {
+              console.error("Google Ads token exchange error:", tokenData);
+              return res.redirect(`/?error=token_exchange&platform=${platform}&details=${encodeURIComponent(tokenData.error_description || tokenData.error)}`);
+            }
+            
+            console.log("Google Ads tokens received successfully");
+            break;
+
+          case 'google-analytics':
+            if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+              console.error("Missing Google Analytics credentials");
+              return res.redirect(`/?error=missing_credentials&platform=${platform}`);
+            }
+            
+            const gaTokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({
+                client_id: process.env.GOOGLE_CLIENT_ID,
+                client_secret: process.env.GOOGLE_CLIENT_SECRET,
+                code: code as string,
+                grant_type: 'authorization_code',
+                redirect_uri: redirectUri,
+              }),
+            });
+            
+            tokenData = await gaTokenResponse.json();
+            
+            if (tokenData.error) {
+              console.error("Google Analytics token exchange error:", tokenData);
+              return res.redirect(`/?error=token_exchange&platform=${platform}&details=${encodeURIComponent(tokenData.error_description || tokenData.error)}`);
+            }
+            break;
+
+          default:
+            return res.redirect(`/?error=platform_not_implemented&platform=${platform}`);
         }
 
         if (!tokenData?.access_token) {
@@ -257,9 +296,11 @@ export function setupPlatformAuth(app: Express) {
           isActive: 1
         });
 
+        console.log(`Successfully created ${platform} connection:`, connection);
         res.redirect(`/?success=connected&platform=${platform}&account=${encodeURIComponent(connection.accountName)}`);
+
       } catch (tokenError) {
-        console.error('Token exchange error:', tokenError);
+        console.error("Token exchange error:", tokenError);
         res.redirect(`/?error=oauth_token&platform=${platform}`);
       }
     } catch (error) {
@@ -267,8 +308,6 @@ export function setupPlatformAuth(app: Express) {
       res.redirect(`/?error=oauth_callback&platform=${platform}`);
     }
   });
-
-
 
   // Get platform data for audit
   app.get("/api/platform-data/:platform/:accountId", requireAuth, async (req, res) => {
@@ -286,7 +325,7 @@ export function setupPlatformAuth(app: Express) {
         return res.status(404).json({ message: "Account connection not found" });
       }
 
-      // Generate mock advertising data based on platform
+      // Generate mock advertising data based on platform for testing
       const mockData = generateMockPlatformData(platform, connection.accountName);
       
       res.json(mockData);
@@ -295,12 +334,6 @@ export function setupPlatformAuth(app: Express) {
       res.status(500).json({ message: "Failed to fetch platform data" });
     }
   });
-
-
-
-
-
-
 }
 
 function generateMockPlatformData(platform: string, accountName: string) {
@@ -357,16 +390,6 @@ function generateMockPlatformData(platform: string, accountName: string) {
             cost: 3200.00,
             conversions: 92,
             roas: 2.87
-          },
-          {
-            name: "Lookalike Audience",
-            reach: 38000,
-            impressions: 124000,
-            clicks: 1950,
-            ctr: 1.57,
-            cost: 2400.00,
-            conversions: 67,
-            roas: 3.12
           }
         ],
         totalSpend: 5600.00,
@@ -377,43 +400,10 @@ function generateMockPlatformData(platform: string, accountName: string) {
         averageRoas: 2.99
       };
 
-    case "tiktok-ads":
-      return {
-        ...baseData,
-        campaigns: [
-          {
-            name: "Video Campaign",
-            videoViews: 245000,
-            impressions: 890000,
-            clicks: 12500,
-            ctr: 1.40,
-            cost: 1800.00,
-            conversions: 78,
-            videoCompletionRate: 0.68
-          }
-        ],
-        totalSpend: 1800.00,
-        totalVideoViews: 245000,
-        totalImpressions: 890000,
-        totalClicks: 12500,
-        averageCompletionRate: 0.68
-      };
-
     default:
       return {
         ...baseData,
-        campaigns: [
-          {
-            name: "Sample Campaign",
-            impressions: 100000,
-            clicks: 2000,
-            cost: 1000.00,
-            conversions: 50
-          }
-        ],
-        totalSpend: 1000.00
+        message: "Platform data simulation not implemented"
       };
   }
 }
-
-export { PLATFORM_CONFIGS };

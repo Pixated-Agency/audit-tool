@@ -82,12 +82,16 @@ export default function Home() {
   });
 
   const createAuditMutation = useMutation({
-    mutationFn: (data: CreateAuditData) => apiRequest("/api/audits", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    }),
-    onSuccess: () => {
+    mutationFn: (data: CreateAuditData) => {
+      console.log("Creating audit with data:", data);
+      return apiRequest("/api/audits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: (result) => {
+      console.log("Audit created successfully:", result);
       queryClient.invalidateQueries({ queryKey: ["/api/audits"] });
       setIsCreateDialogOpen(false);
       resetDialog();
@@ -96,10 +100,12 @@ export default function Home() {
         description: "Your audit is being processed with AI analysis and will be ready shortly.",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error("Audit creation error:", error);
+      const errorMessage = error.response?.data?.message || error.message || "Failed to create audit. Please try again.";
       toast({
         title: "Error",
-        description: "Failed to create audit. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -225,8 +231,22 @@ export default function Home() {
   };
 
   const handleCreateAudit = () => {
+    console.log("handleCreateAudit called with auditData:", auditData);
     if (auditData.name && auditData.platform && auditData.connectionId && auditData.reportFormat) {
+      console.log("All required fields present, creating audit...");
       createAuditMutation.mutate(auditData as CreateAuditData);
+    } else {
+      console.log("Missing required fields:", {
+        name: !!auditData.name,
+        platform: !!auditData.platform,
+        connectionId: !!auditData.connectionId,
+        reportFormat: !!auditData.reportFormat
+      });
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields before creating the audit.",
+        variant: "destructive",
+      });
     }
   };
 

@@ -106,9 +106,16 @@ export default function Home() {
   });
 
   const connectPlatformMutation = useMutation({
-    mutationFn: (platform: string) => apiRequest(`/api/auth/${platform}`, {
-      method: "GET",
-    }),
+    mutationFn: async (platform: string) => {
+      const response = await fetch(`/api/auth/${platform}`, {
+        method: "GET",
+        credentials: "include"
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/account-connections"] });
       queryClient.invalidateQueries({ queryKey: ["/api/account-connections", auditData.platform] });
@@ -269,15 +276,15 @@ export default function Home() {
                 Create Audit
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]" aria-describedby="audit-dialog-description">
+            <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
                 <DialogTitle>Create New Audit - Step {currentStep} of 3</DialogTitle>
-                <p id="audit-dialog-description" className="text-sm text-gray-600">
-                  {currentStep === 1 && "Select the advertising platform you want to audit"}
-                  {currentStep === 2 && "Connect your account using OAuth authentication"}
-                  {currentStep === 3 && "Configure your audit report settings"}
-                </p>
               </DialogHeader>
+              <div className="text-sm text-gray-600 mb-4">
+                {currentStep === 1 && "Select the advertising platform you want to audit"}
+                {currentStep === 2 && "Connect your account using OAuth authentication"}
+                {currentStep === 3 && "Configure your audit report settings"}
+              </div>
               
               {currentStep === 1 && (
                 <div className="space-y-4">

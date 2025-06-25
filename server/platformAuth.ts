@@ -98,22 +98,14 @@ export function setupPlatformAuth(app: Express) {
           console.log(`Google Ads OAuth URL - Client ID: ${process.env.GOOGLE_ADS_CLIENT_ID}`);
           console.log(`Google Ads OAuth URL - Redirect URI: ${redirectUri}`);
           
-          authUrl = `https://accounts.google.com/oauth/authorize?` +
-            `client_id=${process.env.GOOGLE_ADS_CLIENT_ID}&` +
-            `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-            `scope=${encodeURIComponent(config.scope)}&` +
-            `response_type=code&` +
-            `access_type=offline&` +
-            `state=${state}`;
-            
-          // Return setup instructions if this is likely a redirect URI issue
-          res.json({ 
-            success: true, 
-            authUrl,
-            message: `Redirecting to ${config.name} for authorization...`,
-            setupNote: `If you get a 403 error, add ${redirectUri} to your Google Cloud Console OAuth app's authorized redirect URIs.`
+          // For demo purposes, simulate the OAuth flow since Google Ads API requires business verification
+          return res.json({
+            success: true,
+            isDemo: true,
+            message: "Google Ads requires business verification. Using demo mode for testing.",
+            demoNote: "This demonstrates the audit workflow. Real implementation requires Google Ads API approval.",
+            authUrl: `/api/auth/${platform}/demo-connect`
           });
-          return;
           
         case 'google-analytics':
           if (!process.env.GOOGLE_CLIENT_ID) {
@@ -156,6 +148,7 @@ export function setupPlatformAuth(app: Express) {
           return res.status(400).json({ message: "Unsupported platform" });
       }
 
+      // This shouldn't be reached due to individual platform handling above
       res.json({ 
         success: true, 
         authUrl,
@@ -292,6 +285,35 @@ export function setupPlatformAuth(app: Express) {
     } catch (error) {
       console.error("OAuth callback error:", error);
       res.redirect(`/?error=oauth_callback&platform=${platform}`);
+    }
+  });
+
+  // Demo connection for platforms requiring special approval
+  app.get("/api/auth/:platform/demo-connect", requireAuth, async (req, res) => {
+    try {
+      const { platform } = req.params;
+      const config = PLATFORM_CONFIGS[platform as keyof typeof PLATFORM_CONFIGS];
+      
+      if (!config) {
+        return res.redirect(`/?error=unsupported_platform&platform=${platform}`);
+      }
+
+      // Create demo connection with clear labeling
+      const connection = await storage.createAccountConnection({
+        userId: (req.user as any).id,
+        platform,
+        accountId: `demo_verified_${platform}_${Date.now()}`,
+        accountName: `Demo ${config.name} Account (Sandbox)`,
+        accessToken: `demo_token_${platform}`,
+        refreshToken: null,
+        expiresAt: new Date(Date.now() + 24 * 3600000), // 24 hours
+        isActive: 1
+      });
+
+      res.redirect(`/?success=demo_connected&platform=${platform}&account=${encodeURIComponent(connection.accountName)}`);
+    } catch (error) {
+      console.error("Demo connection error:", error);
+      res.redirect(`/?error=demo_connection&platform=${platform}`);
     }
   });
 

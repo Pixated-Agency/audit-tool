@@ -118,8 +118,18 @@ export default function Home() {
     },
     onSuccess: (data) => {
       if (data.authUrl) {
-        // Redirect to OAuth provider
-        window.location.href = data.authUrl;
+        // Handle demo mode vs real OAuth
+        if (data.isDemo) {
+          toast({
+            title: "Demo Mode",
+            description: data.message,
+          });
+          // For demo connections, redirect directly
+          window.location.href = data.authUrl;
+        } else {
+          // Redirect to real OAuth provider
+          window.location.href = data.authUrl;
+        }
       } else if (data.isExisting) {
         // Account already connected
         queryClient.invalidateQueries({ queryKey: ["/api/account-connections"] });
@@ -140,14 +150,23 @@ export default function Home() {
     },
     onError: (error: any) => {
       console.error("Platform connection error:", error);
-      const message = error.response?.data?.message || error.message || "Failed to connect account. Please try again.";
-      const needsSetup = error.response?.data?.needsSetup;
+      const errorData = error.response?.data;
+      const message = errorData?.message || error.message || "Failed to connect account. Please try again.";
+      const needsSetup = errorData?.needsSetup;
+      const setupInstructions = errorData?.setupInstructions;
       
       toast({
         title: needsSetup ? "Setup Required" : "Connection Failed",
-        description: message,
+        description: Array.isArray(setupInstructions) 
+          ? setupInstructions.slice(0, 2).join(". ") + "..." 
+          : message,
         variant: "destructive",
       });
+      
+      // Log detailed setup instructions for developers
+      if (setupInstructions) {
+        console.log("Platform setup instructions:", setupInstructions);
+      }
     },
   });
 
@@ -348,13 +367,20 @@ export default function Home() {
                       <p className="text-gray-500 mb-4">
                         No {getPlatformLabel(auditData.platform || "")} accounts connected yet.
                       </p>
-                      <Button 
-                        onClick={handleConnectPlatform}
-                        disabled={connectPlatformMutation.isPending}
-                        className="bg-meta-blue hover:bg-meta-blue-dark"
-                      >
-                        {connectPlatformMutation.isPending ? "Connecting..." : `Connect ${getPlatformLabel(auditData.platform || "")} Account`}
-                      </Button>
+                      <div className="space-y-2">
+                        <Button 
+                          onClick={handleConnectPlatform}
+                          disabled={connectPlatformMutation.isPending}
+                          className="bg-meta-blue hover:bg-meta-blue-dark w-full"
+                        >
+                          {connectPlatformMutation.isPending ? "Connecting..." : `Connect ${getPlatformLabel(auditData.platform || "")} Account`}
+                        </Button>
+                        {auditData.platform === 'google-ads' && (
+                          <p className="text-xs text-gray-500 text-center">
+                            Note: Google Ads requires API approval and domain verification
+                          </p>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-3">

@@ -113,12 +113,14 @@ export default function Home() {
     }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/account-connections"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/account-connections", auditData.platform] });
       toast({
         title: "Account Connected",
-        description: data.message,
+        description: data.message || "Successfully connected account",
       });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Platform connection error:", error);
       toast({
         title: "Connection Failed",
         description: "Failed to connect account. Please try again.",
@@ -267,9 +269,14 @@ export default function Home() {
                 Create Audit
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[500px]" aria-describedby="audit-dialog-description">
               <DialogHeader>
                 <DialogTitle>Create New Audit - Step {currentStep} of 3</DialogTitle>
+                <p id="audit-dialog-description" className="text-sm text-gray-600">
+                  {currentStep === 1 && "Select the advertising platform you want to audit"}
+                  {currentStep === 2 && "Connect your account using OAuth authentication"}
+                  {currentStep === 3 && "Configure your audit report settings"}
+                </p>
               </DialogHeader>
               
               {currentStep === 1 && (

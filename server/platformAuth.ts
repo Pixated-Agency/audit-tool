@@ -47,6 +47,8 @@ export function setupPlatformAuth(app: Express) {
         return res.status(400).json({ message: "Unsupported platform" });
       }
 
+      console.log(`Creating connection for user ${(req.user as any).id} on platform ${platform}`);
+
       // For demo purposes, we'll simulate OAuth success
       // In production, this would redirect to the actual OAuth provider
       
@@ -62,6 +64,8 @@ export function setupPlatformAuth(app: Express) {
         isActive: true
       });
 
+      console.log(`Successfully created connection:`, mockConnection);
+
       res.json({ 
         success: true, 
         connection: mockConnection,
@@ -69,7 +73,7 @@ export function setupPlatformAuth(app: Express) {
       });
     } catch (error) {
       console.error("Platform auth error:", error);
-      res.status(500).json({ message: "Failed to connect platform" });
+      res.status(500).json({ message: "Failed to connect platform", error: error.message });
     }
   });
 

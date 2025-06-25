@@ -121,12 +121,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createAccountConnection(connectionData: UpsertAccountConnection): Promise<AccountConnection> {
-    // Ensure isActive is properly set as integer
+    // Ensure all data types match the database schema
     const cleanData = {
-      ...connectionData,
-      isActive: connectionData.isActive === true ? 1 : connectionData.isActive === false ? 0 : connectionData.isActive || 1
+      userId: Number(connectionData.userId),
+      platform: String(connectionData.platform),
+      accountId: String(connectionData.accountId),
+      accountName: String(connectionData.accountName),
+      accessToken: connectionData.accessToken ? String(connectionData.accessToken) : null,
+      refreshToken: connectionData.refreshToken ? String(connectionData.refreshToken) : null,
+      expiresAt: connectionData.expiresAt ? new Date(connectionData.expiresAt) : null,
+      isActive: Number(connectionData.isActive === true ? 1 : connectionData.isActive === false ? 0 : connectionData.isActive || 1)
     };
-    console.log('Creating connection with data:', cleanData);
+    console.log('Creating connection with cleaned data:', cleanData);
     const [connection] = await this.db.insert(accountConnections).values(cleanData).returning();
     return connection;
   }

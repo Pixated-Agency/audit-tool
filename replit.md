@@ -118,12 +118,13 @@ This is a full-stack web application built for auditing advertising campaigns ac
 
 ## Recent Changes
 
-- June 24, 2025: Expanded platform support from Meta-only to multi-platform (Google, Facebook, TikTok, Microsoft)
-- Added comprehensive audit workflow with 3-step creation process (Platform Selection → Account Connection → Audit Customization)
-- Implemented audit table dashboard with status tracking, platform icons, and action buttons
-- Created new database tables for audits and account connections
-- Updated UI to Multi-Platform Ad Auditor branding
-- Added real-time audit status updates (processing → completed)
+- June 25, 2025: Integrated OAuth-based platform authentication replacing manual account IDs
+- Implemented ChatGPT-powered audit analysis using OpenAI API for intelligent insights
+- Added platform-specific data generation and AI-driven report creation
+- Fixed database schema issues for account connections with proper integer types
+- Created seamless 3-step workflow: Platform Selection → OAuth Authentication → AI Analysis
+- Successfully connected Facebook Ads demo account with mock OAuth flow
+- Added comprehensive error handling and logging for platform connections
 
 ## Changelog
 

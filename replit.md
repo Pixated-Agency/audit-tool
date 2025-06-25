@@ -118,13 +118,13 @@ This is a full-stack web application built for auditing advertising campaigns ac
 
 ## Recent Changes
 
-- June 25, 2025: Integrated OAuth-based platform authentication replacing manual account IDs
-- Implemented ChatGPT-powered audit analysis using OpenAI API for intelligent insights
-- Added platform-specific data generation and AI-driven report creation
-- Fixed database schema issues for account connections with proper integer types
-- Created seamless 3-step workflow: Platform Selection → OAuth Authentication → AI Analysis
-- Successfully connected Facebook Ads demo account with mock OAuth flow
-- Added comprehensive error handling and logging for platform connections
+- June 25, 2025: Replaced demo account creation with proper OAuth implementation
+- Integrated real Google OAuth flow for Google Ads and Google Analytics platforms
+- Added OAuth callback handling with secure state verification
+- Implemented proper error messages for platforms requiring additional setup
+- Removed all demo/mock account creation to ensure authentic data connections
+- Updated frontend to handle OAuth redirects and setup requirements
+- Added comprehensive OAuth security with state parameters and token exchange
 
 ## Changelog
 

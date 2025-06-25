@@ -47,33 +47,83 @@ export function setupPlatformAuth(app: Express) {
         return res.status(400).json({ message: "Unsupported platform" });
       }
 
-      console.log(`Creating connection for user ${(req.user as any).id} on platform ${platform}`);
+      console.log(`Initiating OAuth for user ${(req.user as any).id} on platform ${platform}`);
 
-      // For demo purposes, we'll simulate OAuth success
-      // In production, this would redirect to the actual OAuth provider
+      // Check if user already has an active connection for this platform
+      const existingConnections = await storage.getAccountConnections((req.user as any).id, platform);
+      const activeConnection = existingConnections.find(conn => conn.isActive === 1);
       
-      // Store mock connection for demo
-      const mockConnection = await storage.createAccountConnection({
+      if (activeConnection) {
+        return res.json({ 
+          success: true, 
+          connection: activeConnection,
+          message: `You already have an active ${config.name} account connected`,
+          isExisting: true
+        });
+      }
+
+      // Generate OAuth URL with state parameter for security
+      const state = Buffer.from(JSON.stringify({
         userId: (req.user as any).id,
         platform,
-        accountId: `demo_${platform}_${Date.now()}`,
-        accountName: `Demo ${config.name} Account`,
-        accessToken: `mock_token_${platform}`,
-        refreshToken: `mock_refresh_${platform}`,
-        expiresAt: new Date(Date.now() + 3600000), // 1 hour
-        isActive: 1
-      });
+        timestamp: Date.now()
+      })).toString('base64');
 
-      console.log(`Successfully created connection:`, mockConnection);
+      const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/${platform}/callback`;
+      
+      let authUrl: string;
+      
+      switch (platform) {
+        case 'google-ads':
+        case 'google-analytics':
+          if (!process.env.GOOGLE_CLIENT_ID) {
+            return res.status(500).json({ 
+              message: "Google OAuth not configured. Please add GOOGLE_CLIENT_ID to environment variables.",
+              needsSetup: true 
+            });
+          }
+          authUrl = `https://accounts.google.com/oauth/authorize?` +
+            `client_id=${process.env.GOOGLE_CLIENT_ID}&` +
+            `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+            `scope=${encodeURIComponent(config.scope)}&` +
+            `response_type=code&` +
+            `access_type=offline&` +
+            `state=${state}`;
+          break;
+          
+        case 'facebook-ads':
+          return res.status(501).json({
+            message: "Facebook Ads OAuth requires app registration. Please contact support for setup instructions.",
+            needsSetup: true
+          });
+          
+        case 'tiktok-ads':
+          return res.status(501).json({
+            message: "TikTok Ads OAuth requires business account approval. Please contact support for setup instructions.",
+            needsSetup: true
+          });
+          
+        case 'microsoft-ads':
+          return res.status(501).json({
+            message: "Microsoft Ads OAuth requires Microsoft Advertising account. Please contact support for setup instructions.", 
+            needsSetup: true
+          });
+          
+        default:
+          return res.status(400).json({ message: "Unsupported platform" });
+      }
 
       res.json({ 
         success: true, 
-        connection: mockConnection,
-        message: `Successfully connected to ${config.name}`
+        authUrl,
+        message: `Redirecting to ${config.name} for authorization...`
       });
     } catch (error) {
       console.error("Platform auth error:", error);
-      res.status(500).json({ message: "Failed to connect platform", error: error.message });
+      res.status(500).json({ 
+        message: "Failed to initiate platform connection", 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
     }
   });
 

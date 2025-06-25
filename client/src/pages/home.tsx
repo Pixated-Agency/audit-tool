@@ -117,18 +117,35 @@ export default function Home() {
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/account-connections"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/account-connections", auditData.platform] });
-      toast({
-        title: "Account Connected",
-        description: data.message || "Successfully connected account",
-      });
+      if (data.authUrl) {
+        // Redirect to OAuth provider
+        window.location.href = data.authUrl;
+      } else if (data.isExisting) {
+        // Account already connected
+        queryClient.invalidateQueries({ queryKey: ["/api/account-connections"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/account-connections", auditData.platform] });
+        toast({
+          title: "Account Already Connected",
+          description: data.message,
+        });
+      } else {
+        // Direct connection successful
+        queryClient.invalidateQueries({ queryKey: ["/api/account-connections"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/account-connections", auditData.platform] });
+        toast({
+          title: "Account Connected",
+          description: data.message || "Successfully connected account",
+        });
+      }
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Platform connection error:", error);
+      const message = error.response?.data?.message || error.message || "Failed to connect account. Please try again.";
+      const needsSetup = error.response?.data?.needsSetup;
+      
       toast({
-        title: "Connection Failed",
-        description: "Failed to connect account. Please try again.",
+        title: needsSetup ? "Setup Required" : "Connection Failed",
+        description: message,
         variant: "destructive",
       });
     },

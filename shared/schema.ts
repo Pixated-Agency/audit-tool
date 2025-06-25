@@ -61,7 +61,7 @@ export const accountConnections = pgTable("account_connections", {
   accessToken: text("access_token"), // Encrypted access token
   refreshToken: text("refresh_token"), // Encrypted refresh token
   expiresAt: timestamp("expires_at"),
-  isActive: integer("is_active").notNull().default(1), // 1 for active, 0 for inactive
+  isActive: boolean("is_active").notNull().default(true), // true for active, false for inactive
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

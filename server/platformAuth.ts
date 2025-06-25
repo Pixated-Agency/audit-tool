@@ -298,6 +298,8 @@ export function setupPlatformAuth(app: Express) {
         return res.redirect(`/?error=unsupported_platform&platform=${platform}`);
       }
 
+      console.log(`Creating demo connection for user ${(req.user as any).id} on platform ${platform}`);
+
       // Create demo connection with clear labeling
       const connection = await storage.createAccountConnection({
         userId: (req.user as any).id,
@@ -310,6 +312,7 @@ export function setupPlatformAuth(app: Express) {
         isActive: 1
       });
 
+      console.log(`Demo connection created successfully:`, connection);
       res.redirect(`/?success=demo_connected&platform=${platform}&account=${encodeURIComponent(connection.accountName)}`);
     } catch (error) {
       console.error("Demo connection error:", error);

@@ -143,8 +143,9 @@ export function setupPlatformAuth(app: Express) {
         success: true, 
         authUrl,
         message: `Redirecting to ${config.name} for authorization...`,
+        redirectUri: redirectUri,
         setupNote: platform === 'google-ads' ? 
-          `If you get a 403 error, your Google Cloud project may need domain verification or Google Ads API approval. Check Google Cloud Console.` : 
+          `Add this redirect URI to Google Cloud Console: ${redirectUri}` : 
           undefined
       });
     } catch (error) {

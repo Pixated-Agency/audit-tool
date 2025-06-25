@@ -127,6 +127,99 @@ export function setupPlatformAuth(app: Express) {
     }
   });
 
+  // OAuth callback handlers
+  app.get("/api/auth/:platform/callback", requireAuth, async (req, res) => {
+    try {
+      const { platform } = req.params;
+      const { code, state, error } = req.query;
+
+      if (error) {
+        return res.redirect(`/?error=oauth_declined&platform=${platform}`);
+      }
+
+      if (!code || !state) {
+        return res.redirect(`/?error=oauth_invalid&platform=${platform}`);
+      }
+
+      // Decode and verify state
+      const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
+      if (stateData.userId !== (req.user as any).id) {
+        return res.redirect(`/?error=oauth_security&platform=${platform}`);
+      }
+
+      const config = PLATFORM_CONFIGS[platform as keyof typeof PLATFORM_CONFIGS];
+      if (!config) {
+        return res.redirect(`/?error=unsupported_platform&platform=${platform}`);
+      }
+
+      // Exchange code for access token
+      let tokenData;
+      const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/${platform}/callback`;
+
+      try {
+        if (platform === 'google-ads' || platform === 'google-analytics') {
+          const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              client_id: process.env.GOOGLE_CLIENT_ID!,
+              client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+              code: code as string,
+              grant_type: 'authorization_code',
+              redirect_uri: redirectUri
+            })
+          });
+          tokenData = await tokenResponse.json();
+        }
+
+        if (!tokenData?.access_token) {
+          throw new Error('Failed to obtain access token');
+        }
+
+        // Fetch account information based on platform
+        let accountInfo = { id: 'real_account', name: `Real ${config.name} Account` };
+        
+        if (platform === 'google-ads') {
+          try {
+            const accountResponse = await fetch('https://googleads.googleapis.com/v14/customers:listAccessibleCustomers', {
+              headers: { 
+                'Authorization': `Bearer ${tokenData.access_token}`,
+                'developer-token': process.env.GOOGLE_ADS_DEVELOPER_TOKEN || ''
+              }
+            });
+            const accountData = await accountResponse.json();
+            if (accountData.resourceNames?.length > 0) {
+              accountInfo.id = accountData.resourceNames[0];
+              accountInfo.name = `Google Ads Account`;
+            }
+          } catch (apiError) {
+            console.log('Using basic account info due to API limitations');
+          }
+        }
+
+        // Store the connection
+        const connection = await storage.createAccountConnection({
+          userId: (req.user as any).id,
+          platform,
+          accountId: accountInfo.id,
+          accountName: accountInfo.name,
+          accessToken: tokenData.access_token,
+          refreshToken: tokenData.refresh_token || null,
+          expiresAt: tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000) : null,
+          isActive: 1
+        });
+
+        res.redirect(`/?success=connected&platform=${platform}&account=${encodeURIComponent(connection.accountName)}`);
+      } catch (tokenError) {
+        console.error('Token exchange error:', tokenError);
+        res.redirect(`/?error=oauth_token&platform=${platform}`);
+      }
+    } catch (error) {
+      console.error("OAuth callback error:", error);
+      res.redirect(`/?error=oauth_callback&platform=${platform}`);
+    }
+  });
+
   // Get platform data for audit
   app.get("/api/platform-data/:platform/:accountId", requireAuth, async (req, res) => {
     try {

@@ -43,7 +43,7 @@ interface AccountConnection {
   platform: string;
   accountId: string;
   accountName: string;
-  isActive: boolean;
+  isActive: number;
 }
 
 const platforms = [
@@ -353,7 +353,7 @@ export default function Home() {
                               <p className="font-medium">{connection.accountName}</p>
                               <p className="text-sm text-gray-500">ID: {connection.accountId}</p>
                             </div>
-                            {connection.isActive && (
+                            {connection.isActive === 1 && (
                               <Badge variant="secondary" className="bg-green-100 text-green-800">
                                 Active
                               </Badge>

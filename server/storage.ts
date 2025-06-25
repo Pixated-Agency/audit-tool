@@ -106,13 +106,13 @@ export class DatabaseStorage implements IStorage {
 
   // Account connection operations
   async getAccountConnections(userId: number, platform?: string): Promise<AccountConnection[]> {
-    let query = this.db.select().from(accountConnections).where(eq(accountConnections.userId, userId));
+    const baseQuery = this.db.select().from(accountConnections).where(eq(accountConnections.userId, userId));
     
     if (platform) {
-      query = query.where(eq(accountConnections.platform, platform));
+      return await baseQuery.where(eq(accountConnections.platform, platform));
     }
     
-    return await query;
+    return await baseQuery;
   }
 
   async getAccountConnection(id: number): Promise<AccountConnection | undefined> {
@@ -121,7 +121,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createAccountConnection(connectionData: UpsertAccountConnection): Promise<AccountConnection> {
-    const [connection] = await this.db.insert(accountConnections).values(connectionData).returning();
+    // Ensure isActive is properly set as integer
+    const cleanData = {
+      ...connectionData,
+      isActive: connectionData.isActive === true ? 1 : connectionData.isActive === false ? 0 : connectionData.isActive || 1
+    };
+    console.log('Creating connection with data:', cleanData);
+    const [connection] = await this.db.insert(accountConnections).values(cleanData).returning();
     return connection;
   }
 

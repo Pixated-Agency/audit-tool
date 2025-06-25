@@ -61,7 +61,7 @@ export function setupPlatformAuth(app: Express) {
         accessToken: `mock_token_${platform}`,
         refreshToken: `mock_refresh_${platform}`,
         expiresAt: new Date(Date.now() + 3600000), // 1 hour
-        isActive: true
+        isActive: 1
       });
 
       console.log(`Successfully created connection:`, mockConnection);
